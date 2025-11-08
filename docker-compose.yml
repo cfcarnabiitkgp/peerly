@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # Qdrant Vector Database
+  # Stores embedded documents with persistent storage
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: peerly-qdrant
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC API (optional, for high-performance clients)
+    volumes:
+      # Bind mount for easy inspection and backup
+      # Data persists in ./data/qdrant even after container restart
+      - ./data/qdrant:/qdrant/storage
+    # environment:
+      # Optional: Qdrant configuration
+      # QDRANT__SERVICE__HTTP_PORT: 6333
+      # QDRANT__SERVICE__GRPC_PORT: 6334
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - peerly-network
+
+  # Future: Backend API service (FastAPI)
+  # backend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: peerly-backend
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./app:/app
+  #   environment:
+  #     - QDRANT_URL=http://qdrant:6333
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #   depends_on:
+  #     qdrant:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - peerly-network
+
+  # Future: Frontend service (React + Vite)
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: peerly-frontend
+  #   ports:
+  #     - "5173:5173"
+  #   volumes:
+  #     - ./frontend:/app
+  #   depends_on:
+  #     - backend
+  #   restart: unless-stopped
+  #   networks:
+  #     - peerly-network
+
+networks:
+  peerly-network:
+    driver: bridge
+
+# Cloud Deployment Notes:
+#
+# Railway:
+#   - Railway auto-detects docker-compose.yml
+#   - Use Railway volumes: https://docs.railway.app/reference/volumes
+#   - Command: railway up
+#
+# AWS ECS:
+#   - Option 1: ECS CLI
+#     ecs-cli compose up
+#   - Option 2: Convert to task definition
+#     Use Amazon EFS for persistent volumes
+#   - Ref: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/docker-compose.html
+#
+# Azure Container Instances:
+#   - Convert to Azure Container Instances YAML
+#   - Use Azure Files for persistent storage
+#   - Command: az container create --file docker-compose.yml
+#   - Ref: https://learn.microsoft.com/en-us/azure/container-instances/
+#
+# Google Cloud Run:
+#   - Deploy with Cloud Run multi-container support
+#   - Use Cloud Storage FUSE for persistence
+#   - Ref: https://cloud.google.com/run/docs/deploying

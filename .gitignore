@@ -1,0 +1,64 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+env/
+
+# Environment variables
+.env
+.env.*
+.env.local
+.env.production
+.env.development
+
+# Logs
+logs/
+*.log
+log/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Process IDs
+*.pid
+
+# Temporary files
+/tmp/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# RAG System
+app/embedding_cache/
+qdrant_storage/
+data/qdrant/                # Docker persistent volume for Qdrant
+*.pdf
+!rag_resources/README.md
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
