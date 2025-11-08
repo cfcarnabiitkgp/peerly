@@ -3,6 +3,7 @@ Base agent class for all review agents.
 """
 from abc import ABC, abstractmethod
 from typing import List
+import json
 from langchain_openai import ChatOpenAI
 from app.models.schemas import Section, SuggestionItem, SuggestionType, SeverityLevel
 from app.config.settings import settings
@@ -98,7 +99,7 @@ class BaseReviewAgent(ABC):
         Parse LLM response into structured suggestions.
 
         Args:
-            response: Raw LLM response
+            response: Raw LLM response (expected to be JSON array)
             section: Section being reviewed
 
         Returns:
@@ -106,26 +107,82 @@ class BaseReviewAgent(ABC):
         """
         suggestions = []
 
-        # Split response into individual suggestions
-        # Expected format: each suggestion on a new line starting with "- " or numbered
+        try:
+            # Try to parse JSON response
+            # Expected format: [{"issue": "...", "explanation": "...", "suggested_fix": "..."}]
+            response_clean = response.strip()
+
+            # Extract JSON array if wrapped in markdown code blocks
+            if response_clean.startswith('```'):
+                # Remove markdown code fences
+                lines = response_clean.split('\n')
+                response_clean = '\n'.join(lines[1:-1]) if len(lines) > 2 else response_clean
+                response_clean = response_clean.replace('```json', '').replace('```', '').strip()
+
+            data = json.loads(response_clean)
+
+            # Handle both array and single object
+            if isinstance(data, dict):
+                data = [data]
+
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+
+                issue = item.get('issue', '').strip()
+                explanation = item.get('explanation', '').strip()
+                suggested_fix = item.get('suggested_fix', '').strip()
+
+                # Skip if issue is empty or too short
+                if not issue or len(issue) < 10:
+                    continue
+
+                # Determine severity based on issue text
+                severity = self._determine_severity(issue)
+
+                suggestions.append(SuggestionItem(
+                    text=issue,
+                    line=section.line_start,
+                    severity=severity,
+                    explanation=explanation if explanation else None,
+                    suggested_fix=suggested_fix if suggested_fix else None
+                ))
+
+        except json.JSONDecodeError as e:
+            # Fallback to old parsing if JSON fails
+            print(f"Warning: Failed to parse JSON response from {self.agent_name}: {e}")
+            print(f"Response was: {response[:200]}...")
+            suggestions = self._parse_suggestions_fallback(response, section)
+
+        return suggestions
+
+    def _parse_suggestions_fallback(self, response: str, section: Section) -> List[SuggestionItem]:
+        """
+        Fallback parser for non-JSON responses (backwards compatibility).
+
+        Args:
+            response: Raw LLM response
+            section: Section being reviewed
+
+        Returns:
+            List of suggestion items
+        """
+        suggestions = []
         lines = response.strip().split('\n')
 
         for line in lines:
             line = line.strip()
 
-            # Skip empty lines
             if not line:
                 continue
 
             # Remove bullet points or numbers
             if line.startswith('- ') or line.startswith('* '):
                 line = line[2:].strip()
-            elif line[0].isdigit() and '. ' in line:
+            elif line and line[0].isdigit() and '. ' in line:
                 line = line.split('. ', 1)[1].strip()
 
-            # Only process non-empty suggestions
             if line and len(line) > 10:
-                # Determine severity based on keywords
                 severity = self._determine_severity(line)
 
                 suggestions.append(SuggestionItem(
