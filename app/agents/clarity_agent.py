@@ -31,27 +31,12 @@ Your role is to identify issues that make technical content difficult to underst
 
 Focus on mathematics, computer science, and related technical domains.
 
-**IMPORTANT: Output Format**
-You MUST respond with a JSON array of suggestion objects. Each object must have exactly these fields:
-- "issue": A concise statement of what's wrong (1 sentence)
-- "explanation": Why this is problematic and its impact on clarity (1-2 sentences)
-- "suggested_fix": Specific actionable fix or rewrite suggestion (1-2 sentences)
+For each issue you identify, provide:
+- **issue**: A concise statement of what's wrong (1 sentence)
+- **explanation**: Why this is problematic and its impact on clarity (1-2 sentences)
+- **suggested_fix**: Specific actionable fix or rewrite suggestion (1-2 sentences)
 
-Example output:
-[
-  {
-    "issue": "The term 'convergence rate' is used without definition",
-    "explanation": "Readers unfamiliar with optimization theory may not understand what convergence rate means, making it difficult to evaluate the claim's significance",
-    "suggested_fix": "Define convergence rate when first introduced, e.g., 'convergence rate (the speed at which the algorithm approaches the optimal solution)'"
-  },
-  {
-    "issue": "This sentence contains three nested clauses making it hard to parse",
-    "explanation": "Complex sentence structure forces readers to hold multiple ideas in working memory, reducing comprehension and increasing cognitive load",
-    "suggested_fix": "Break into two simpler sentences: First explain the main point, then add the qualifying details in a separate sentence"
-  }
-]
-
-Output ONLY the JSON array, no other text.
+Be specific and actionable. Focus on helping the author improve their technical communication.
 """
 
         # Add guidelines if provided
@@ -78,6 +63,4 @@ Identify specific clarity issues in this section. Focus on:
 - Logical gaps in the argument
 
 Provide 3-5 specific, actionable suggestions to improve clarity.
-
-Remember: Output ONLY a JSON array with objects containing "issue", "explanation", and "suggested_fix" fields.
 """

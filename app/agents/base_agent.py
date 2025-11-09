@@ -3,9 +3,14 @@ Base agent class for all review agents.
 """
 from abc import ABC, abstractmethod
 from typing import List
-import json
 from langchain_openai import ChatOpenAI
-from app.models.schemas import Section, SuggestionItem, SuggestionType, SeverityLevel
+from app.models.schemas import (
+    Section,
+    SuggestionItem,
+    SuggestionType,
+    SeverityLevel,
+    AgentSuggestionResponse,
+)
 from app.config.settings import settings
 
 # keywords for determining severity levels of suggestions
@@ -65,7 +70,7 @@ class BaseReviewAgent(ABC):
         self, section: Section, guidelines: str = ""
     ) -> List[SuggestionItem]:
         """
-        Review a section and generate suggestions.
+        Review a section and generate suggestions using structured output.
 
         Args:
             section: Section to review
@@ -75,125 +80,39 @@ class BaseReviewAgent(ABC):
             List of suggestion items
         """
         try:
+            # Create structured LLM that returns AgentSuggestionResponse
+            structured_llm = self.llm.with_structured_output(AgentSuggestionResponse)
+
             # Build messages
             messages = [
                 {"role": "system", "content": self.get_system_prompt(guidelines)},
                 {"role": "user", "content": self.get_user_prompt(section)}
             ]
 
-            # Get response from LLM
-            response = await self.llm.ainvoke(messages)
-            content = response.content
+            # Get structured response - returns AgentSuggestionResponse object!
+            response = await structured_llm.ainvoke(messages)
 
-            # Parse suggestions from response
-            suggestions = self._parse_suggestions(content, section)
+            # Convert StructuredSuggestion objects to SuggestionItem objects
+            suggestions = []
+            for structured_suggestion in response.suggestions:
+                # Determine severity based on issue text
+                severity = self._determine_severity(structured_suggestion.issue)
+
+                suggestions.append(SuggestionItem(
+                    text=structured_suggestion.issue,
+                    line=section.line_start,
+                    severity=severity,
+                    explanation=structured_suggestion.explanation,
+                    suggested_fix=structured_suggestion.suggested_fix
+                ))
 
             return suggestions
 
         except Exception as e:
             print(f"Error in {self.agent_name}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return []
-
-    def _parse_suggestions(self, response: str, section: Section) -> List[SuggestionItem]:
-        """
-        Parse LLM response into structured suggestions.
-
-        Args:
-            response: Raw LLM response (expected to be JSON array)
-            section: Section being reviewed
-
-        Returns:
-            List of suggestion items
-        """
-        suggestions = []
-
-        try:
-            # Try to parse JSON response
-            # Expected format: [{"issue": "...", "explanation": "...", "suggested_fix": "..."}]
-            response_clean = response.strip()
-
-            # Extract JSON array if wrapped in markdown code blocks
-            if response_clean.startswith('```'):
-                # Remove markdown code fences
-                lines = response_clean.split('\n')
-                response_clean = '\n'.join(lines[1:-1]) if len(lines) > 2 else response_clean
-                response_clean = response_clean.replace('```json', '').replace('```', '').strip()
-
-            data = json.loads(response_clean)
-
-            # Handle both array and single object
-            if isinstance(data, dict):
-                data = [data]
-
-            for item in data:
-                if not isinstance(item, dict):
-                    continue
-
-                issue = item.get('issue', '').strip()
-                explanation = item.get('explanation', '').strip()
-                suggested_fix = item.get('suggested_fix', '').strip()
-
-                # Skip if issue is empty or too short
-                if not issue or len(issue) < 10:
-                    continue
-
-                # Determine severity based on issue text
-                severity = self._determine_severity(issue)
-
-                suggestions.append(SuggestionItem(
-                    text=issue,
-                    line=section.line_start,
-                    severity=severity,
-                    explanation=explanation if explanation else None,
-                    suggested_fix=suggested_fix if suggested_fix else None
-                ))
-
-        except json.JSONDecodeError as e:
-            # Fallback to old parsing if JSON fails
-            print(f"Warning: Failed to parse JSON response from {self.agent_name}: {e}")
-            print(f"Response was: {response[:200]}...")
-            suggestions = self._parse_suggestions_fallback(response, section)
-
-        return suggestions
-
-    def _parse_suggestions_fallback(self, response: str, section: Section) -> List[SuggestionItem]:
-        """
-        Fallback parser for non-JSON responses (backwards compatibility).
-
-        Args:
-            response: Raw LLM response
-            section: Section being reviewed
-
-        Returns:
-            List of suggestion items
-        """
-        suggestions = []
-        lines = response.strip().split('\n')
-
-        for line in lines:
-            line = line.strip()
-
-            if not line:
-                continue
-
-            # Remove bullet points or numbers
-            if line.startswith('- ') or line.startswith('* '):
-                line = line[2:].strip()
-            elif line and line[0].isdigit() and '. ' in line:
-                line = line.split('. ', 1)[1].strip()
-
-            if line and len(line) > 10:
-                severity = self._determine_severity(line)
-
-                suggestions.append(SuggestionItem(
-                    text=line,
-                    line=section.line_start,
-                    severity=severity,
-                    explanation=None,
-                    suggested_fix=None
-                ))
-
-        return suggestions
 
     def _determine_severity(self, text: str) -> SeverityLevel:
         """

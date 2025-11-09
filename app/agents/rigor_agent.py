@@ -32,27 +32,12 @@ Your role is to identify issues related to mathematical and experimental rigor:
 
 Focus on mathematics, computer science, and related technical domains.
 
-**IMPORTANT: Output Format**
-You MUST respond with a JSON array of suggestion objects. Each object must have exactly these fields:
-- "issue": A concise statement of what rigor problem exists (1 sentence)
-- "explanation": Why this undermines technical validity or scientific credibility (1-2 sentences)
-- "suggested_fix": Specific actionable fix to address the rigor issue (1-2 sentences)
+For each issue you identify, provide:
+- **issue**: A concise statement of what rigor problem exists (1 sentence)
+- **explanation**: Why this undermines technical validity or scientific credibility (1-2 sentences)
+- **suggested_fix**: Specific actionable fix to address the rigor issue (1-2 sentences)
 
-Example output:
-[
-  {
-    "issue": "The convergence proof assumes continuity without stating this requirement",
-    "explanation": "This unstated assumption means the proof is incomplete and could mislead readers about when the result applies. Mathematical rigor requires all assumptions to be explicitly stated",
-    "suggested_fix": "Add 'Assume f is continuous on [a,b]' before the proof, and discuss what happens if this assumption is violated"
-  },
-  {
-    "issue": "No statistical significance test is provided for the performance comparison",
-    "explanation": "Without significance testing, readers cannot determine if observed differences are meaningful or due to random variation, undermining the validity of the experimental claims",
-    "suggested_fix": "Conduct a paired t-test or Wilcoxon signed-rank test to determine statistical significance (p < 0.05), and report p-values in the results table"
-  }
-]
-
-Output ONLY the JSON array, no other text.
+Be specific and constructive. Focus on helping the author strengthen their technical and scientific rigor.
 """
 
         # Add guidelines if provided
@@ -80,6 +65,4 @@ Identify specific rigor issues in this section. Focus on:
 - Details needed for reproducibility
 
 Provide 3-5 specific, actionable suggestions to improve rigor.
-
-Remember: Output ONLY a JSON array with objects containing "issue", "explanation", and "suggested_fix" fields.
 """

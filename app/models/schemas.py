@@ -6,6 +6,42 @@ from typing import List, Optional, Literal
 from enum import Enum
 
 
+# ============================================================================
+# Structured LLM Output Models (for agents using with_structured_output)
+# ============================================================================
+
+class StructuredSuggestion(BaseModel):
+    """
+    Individual suggestion from LLM with structured fields.
+    Used by agents with LangChain's with_structured_output().
+    """
+    issue: str = Field(
+        description="Concise statement of what's wrong (1 sentence)"
+    )
+    explanation: str = Field(
+        description="Why this is problematic and its impact (1-2 sentences)"
+    )
+    suggested_fix: str = Field(
+        description="Specific actionable fix or improvement (1-2 sentences)"
+    )
+
+
+class AgentSuggestionResponse(BaseModel):
+    """
+    Response model for agent LLM calls.
+    Contains a list of structured suggestions.
+    """
+    suggestions: List[StructuredSuggestion] = Field(
+        description="List of suggestions for the reviewed section",
+        default_factory=list
+    )
+
+
+# ============================================================================
+# API Models (for HTTP requests/responses)
+# ============================================================================
+
+
 class SuggestionType(str, Enum):
     """Types of suggestions that can be generated."""
     CLARITY = "clarity"
@@ -75,13 +111,3 @@ class ReviewResponse(BaseModel):
     total_suggestions: int = Field(0, description="Total number of suggestions")
     processing_time: float = Field(..., description="Time taken to process in seconds")
     error: Optional[str] = Field(None, description="Error message if any")
-
-
-class AgentState(BaseModel):
-    """State shared across agents in the workflow."""
-    sections: List[Section] = Field(default_factory=list, description="Parsed sections")
-    clarity_suggestions: List[SectionSuggestions] = Field(default_factory=list)
-    rigor_suggestions: List[SectionSuggestions] = Field(default_factory=list)
-    ethics_suggestions: List[SectionSuggestions] = Field(default_factory=list)
-    final_suggestions: List[SectionSuggestions] = Field(default_factory=list)
-    error: Optional[str] = None

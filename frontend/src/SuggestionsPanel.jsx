@@ -290,7 +290,7 @@ function SuggestionsPanel({ latexContent, onClose, onSuggestionsChange, expanded
                               )}
                               {item.suggested_fix && (
                                 <div className="item-fix">
-                                  <strong>Suggested fix:</strong> {item.suggested_fix}
+                                  {item.suggested_fix}
                                 </div>
                               )}
                             </div>
