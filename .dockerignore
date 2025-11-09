@@ -87,6 +87,26 @@ stop.sh
 # Examples
 examples/
 
+# Tests (don't need in production)
+tests/
+*.ipynb
+*.ipynb_checkpoints/
+
+# Deployment files (don't need in image)
+RAILWAY_DEPLOYMENT.md
+DEMO_DAY_PRESENTATION.md
+PRESENTATION_TRANSCRIPT.md
+TODO.md
+Procfile
+railway.toml
+
+# Database files
+*.db
+sqlite.db
+
+# Frontend (separate service)
+frontend/
+
 # Temporary files
 /tmp/
 *.tmp

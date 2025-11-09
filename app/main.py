@@ -13,10 +13,10 @@ app = FastAPI(
     description="Multi-agentic LLM co-reviewing assistant for technical manuscript writing"
 )
 
-# Configure CORS
+# Configure CORS (use dynamic origins list for Railway compatibility)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,6 +35,16 @@ async def root():
         "message": "Welcome to Peerly - Technical Manuscript Reviewer",
         "version": settings.app_version,
         "docs": "/docs"
+    }
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint for Railway."""
+    return {
+        "status": "healthy",
+        "service": "peerly-api",
+        "version": settings.app_version
     }
 
 

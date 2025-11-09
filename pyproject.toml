@@ -2,7 +2,6 @@
 name = "peerly-demo"
 version = "0.1.0"
 description = "Multi-agentic LLM co-reviewing assistant for technical manuscript writing"
-readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.104.1",
@@ -14,21 +13,25 @@ dependencies = [
     "langchain-core>=0.1.0,<1.0",
     "langchain-community>=0.0.10,<1.0",
     "langchain-text-splitters>=0.0.1,<1.0",
-    "langchain-experimental>=0.0.1,<1.0",
     "langchain-qdrant>=0.1.0",
     "langgraph>=0.0.20",
     "qdrant-client>=1.7.0",
     "pypdf>=3.17.0",
     "python-dotenv>=1.0.0",
     "aiofiles>=23.2.1",
+    "fastembed>=0.2.0",
+    "python-multipart>=0.0.20",
+]
+
+[project.optional-dependencies]
+dev = [
     "jupyter>=1.0.0",
     "matplotlib>=3.7.0",
     "numpy>=1.24.0",
-    "fastembed>=0.2.0",
-    "python-multipart>=0.0.20",
     "unstructured[pdf]>=0.10.0",
     "pillow>=10.0.0",
     "pillow-heif>=0.13.0",
+    "langchain-experimental>=0.0.1,<1.0",
 ]
 
 [build-system]
@@ -36,7 +39,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["app"]
+py-modules = []
 
-[tool.setuptools.package-data]
-app = ["**/*"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

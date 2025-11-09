@@ -40,11 +40,28 @@ class Settings(BaseSettings):
     use_rag: bool = True  # Enable/disable RAG (set USE_RAG=false to disable)
     use_semantic_cache: bool = False  # Enable/disable semantic caching for RAG queries
 
+    # Railway-specific settings
+    railway_environment: str | None = None  # Will be "production" on Railway
+    railway_static_url: str | None = None
+    railway_public_domain: str | None = None  # Backend's own domain (auto-provided by Railway)
+    frontend_domain: str | None = None  # Frontend domain for CORS
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False
     )
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Get CORS origins including Railway frontend URL."""
+        origins = self.cors_origins.copy() if isinstance(self.cors_origins, list) else [self.cors_origins]
+
+        # Add Railway frontend URL if available
+        if self.frontend_domain:
+            origins.append(f"https://{self.frontend_domain}")
+
+        return origins
 
 
 # Global settings instance
