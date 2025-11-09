@@ -12,11 +12,7 @@ from app.models.schemas import (
     AgentSuggestionResponse,
 )
 from app.config.settings import settings
-
-# keywords for determining severity levels of suggestions
-SEVERITY_ERROR_KEYWORDS = ['must', 'required', 'missing', 'incorrect', 'error', 'critical']
-SEVERITY_WARNING_KEYWORDS = ['should', 'recommend', 'unclear', 'ambiguous', 'consider revising']
-
+from app.utils.severity import score_to_severity_level
 
 class BaseReviewAgent(ABC):
     """
@@ -95,13 +91,14 @@ class BaseReviewAgent(ABC):
             # Convert StructuredSuggestion objects to SuggestionItem objects
             suggestions = []
             for structured_suggestion in response.suggestions:
-                # Determine severity based on issue text
-                severity = self._determine_severity(structured_suggestion.issue)
+                # Determine severity level from score using centralized utility
+                severity = score_to_severity_level(structured_suggestion.severity_score)
 
                 suggestions.append(SuggestionItem(
                     text=structured_suggestion.issue,
-                    line=section.line_start,
+                    line=structured_suggestion.line,
                     severity=severity,
+                    severity_score=structured_suggestion.severity_score,
                     explanation=structured_suggestion.explanation,
                     suggested_fix=structured_suggestion.suggested_fix
                 ))
@@ -113,27 +110,3 @@ class BaseReviewAgent(ABC):
             import traceback
             traceback.print_exc()
             return []
-
-    def _determine_severity(self, text: str) -> SeverityLevel:
-        """
-        Determine severity level based on suggestion text.
-
-        Args:
-            text: Suggestion text
-
-        Returns:
-            Severity level
-        """
-        text_lower = text.lower()
-
-        # Error indicators
-        if any(keyword in text_lower for keyword in SEVERITY_ERROR_KEYWORDS):
-            return SeverityLevel.ERROR
-
-        # Warning indicators
-        elif any(keyword in text_lower for keyword in SEVERITY_WARNING_KEYWORDS):
-            return SeverityLevel.WARNING
-
-        # Info by default
-        else:
-            return SeverityLevel.INFO

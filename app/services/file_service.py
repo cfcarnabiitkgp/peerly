@@ -4,6 +4,8 @@ File management service for handling project files.
 from pathlib import Path
 from typing import List, Dict, Optional
 import shutil
+import aiofiles
+import aiofiles.os
 
 
 class FileService:
@@ -39,9 +41,9 @@ class FileService:
 
             file_path = self.project_dir / filename
 
-            # Save the file
-            with open(file_path, "wb") as f:
-                f.write(content)
+            # Save the file using async I/O
+            async with aiofiles.open(file_path, "wb") as f:
+                await f.write(content)
 
             return {
                 "success": True,
@@ -97,13 +99,15 @@ class FileService:
         try:
             file_path = self.project_dir / filename
 
-            if not file_path.exists():
+            # Check existence using async
+            if not await aiofiles.os.path.exists(file_path):
                 return {
                     "success": False,
                     "error": "File not found"
                 }
 
-            file_path.unlink()
+            # Delete file using async
+            await aiofiles.os.remove(file_path)
 
             return {
                 "success": True,
@@ -128,13 +132,16 @@ class FileService:
         try:
             file_path = self.project_dir / filename
 
-            if not file_path.exists():
+            # Check existence using async
+            if not await aiofiles.os.path.exists(file_path):
                 return {
                     "success": False,
                     "error": "File not found"
                 }
 
-            content = file_path.read_text(encoding='utf-8')
+            # Read file using async I/O
+            async with aiofiles.open(file_path, "r", encoding='utf-8') as f:
+                content = await f.read()
 
             return {
                 "success": True,

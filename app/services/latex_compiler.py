@@ -1,10 +1,12 @@
 """
 LaTeX compilation service using Tectonic.
 """
+import asyncio
 import subprocess
 import shutil
 from pathlib import Path
 from typing import Dict
+import aiofiles
 
 
 class LaTeXCompiler:
@@ -34,26 +36,45 @@ class LaTeXCompiler:
             Dict with success status and compilation details
         """
         try:
-            # Write LaTeX content to the project directory
+            # Write LaTeX content to the project directory using async I/O
             tex_file = self.project_dir / "document.tex"
-            tex_file.write_text(latex_content)
+            async with aiofiles.open(tex_file, "w", encoding="utf-8") as f:
+                await f.write(latex_content)
 
             pdf_file = self.project_dir / "document.pdf"
 
-            # Run tectonic to compile LaTeX to PDF
+            # Run tectonic to compile LaTeX to PDF using async subprocess
             # tectonic will use all files in the project directory
-            result = subprocess.run(
-                ["tectonic", str(tex_file)],
+            process = await asyncio.create_subprocess_exec(
+                "tectonic", str(tex_file),
                 cwd=str(self.project_dir),
-                capture_output=True,
-                text=True,
-                timeout=30
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
 
-            if result.returncode != 0:
+            # Wait for process with timeout
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=30.0
+                )
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
                 return {
                     "success": False,
-                    "error": result.stderr or result.stdout,
+                    "error": "Compilation timeout",
+                    "message": "LaTeX compilation took too long"
+                }
+
+            # Decode output
+            stdout_text = stdout.decode('utf-8') if stdout else ""
+            stderr_text = stderr.decode('utf-8') if stderr else ""
+
+            if process.returncode != 0:
+                return {
+                    "success": False,
+                    "error": stderr_text or stdout_text,
                     "message": "LaTeX compilation failed"
                 }
 
@@ -75,12 +96,6 @@ class LaTeXCompiler:
                 "pdf_path": str(output_pdf)
             }
 
-        except subprocess.TimeoutExpired:
-            return {
-                "success": False,
-                "error": "Compilation timeout",
-                "message": "LaTeX compilation took too long"
-            }
         except FileNotFoundError:
             return {
                 "success": False,

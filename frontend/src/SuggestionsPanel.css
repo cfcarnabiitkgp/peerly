@@ -139,6 +139,57 @@
   filter: invert(20%) sepia(86%) saturate(3476%) hue-rotate(261deg) brightness(86%) contrast(93%);
 }
 
+/* Severity Statistics Bar */
+.severity-stats-bar {
+  padding: 0.75rem 1rem;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  flex-shrink: 0;
+}
+
+.severity-stats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.severity-stat-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.severity-stat-badge.error {
+  color: #991B1B;
+}
+
+.severity-stat-badge.warning {
+  color: #92400E;
+}
+
+.severity-stat-badge.info {
+  color: #1E40AF;
+}
+
+.severity-stat-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.severity-stat-label {
+  font-weight: 600;
+}
+
+.severity-stat-count {
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
 /* Agent Controls */
 .agent-controls {
   padding: 0.75rem 1rem;
@@ -469,9 +520,9 @@
   align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.5rem;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   color: #1C2434;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .type-icon {
@@ -507,17 +558,17 @@
 
 .suggestion-item.severity-error {
   border-left-color: #EF4444;
-  background: #FEF2F2;
+  background: #FFFFFF;
 }
 
 .suggestion-item.severity-warning {
   border-left-color: #F59E0B;
-  background: #FFFBEB;
+  background: #FFFFFF;
 }
 
 .suggestion-item.severity-info {
   border-left-color: #3B82F6;
-  background: #EFF6FF;
+  background: #FFFFFF;
 }
 
 .item-header {
@@ -527,9 +578,33 @@
   margin-bottom: 0.5rem;
 }
 
+.severity-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .severity-badge {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
+  padding: 0.125rem 0.375rem 0.125rem 0;
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.severity-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.severity-score {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #64748B;
+  background: #F1F5F9;
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
 }
@@ -547,6 +622,31 @@
   font-weight: 500;
 }
 
+.item-label {
+  font-weight: 700;
+  color: #334155;
+}
+
+.explanation-toggle {
+  background: none;
+  border: none;
+  color: #6563ff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0;
+  margin-bottom: 0.375rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.explanation-toggle:hover {
+  color: #5048e0;
+  text-decoration: underline;
+}
+
 .item-explanation {
   font-size: 0.75rem;
   color: #64748B;
@@ -554,21 +654,35 @@
   margin-bottom: 0.5rem;
   padding-left: 0.75rem;
   border-left: 2px solid #E2E8F0;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .item-fix {
   font-size: 0.75rem;
-  color: #10B981;
-  background: #F0FDF4;
+  color: #475569;
+  background: #F8FAFC;
   padding: 0.5rem;
-  border-radius: 0.25rem;
-  border: 1px solid #D1FAE5;
+  border-radius: 0.375rem;
+  border: 1px solid #E2E8F0;
   margin-top: 0.5rem;
+  line-height: 1.6;
 }
 
 .item-fix::before {
-  content: "💡 Suggested fix: ";
+  content: "Suggested fix: ";
   font-weight: 600;
+  color: #334155;
 }
 
 .item-actions {

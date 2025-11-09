@@ -16,13 +16,21 @@ class StructuredSuggestion(BaseModel):
     Used by agents with LangChain's with_structured_output().
     """
     issue: str = Field(
-        description="Concise statement of what's wrong (1 sentence)"
+        description="Concise statement of what's wrong (1 sentence). Keep it short and concise."
+    )
+    line: int = Field(
+        description="The specific line number where this issue occurs in the provided content"
+    )
+    severity_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Severity score from 0.0 to 1.0 indicating how critical this issue is. Use the full range naturally based on actual severity."
     )
     explanation: str = Field(
-        description="Why this is problematic and its impact (1-2 sentences)"
+        description="Why this is problematic and its impact (maximum 1-2 sentences). Use concise language and avoid unnecessary details."
     )
     suggested_fix: str = Field(
-        description="Specific actionable fix or improvement (1-2 sentences)"
+        description="Specific actionable fix or improvement (maximum 1-2 sentences). Use concise language and avoid unnecessary details."
     )
 
 
@@ -33,6 +41,46 @@ class AgentSuggestionResponse(BaseModel):
     """
     suggestions: List[StructuredSuggestion] = Field(
         description="List of suggestions for the reviewed section",
+        default_factory=list
+    )
+
+
+class OrchestratedSuggestion(BaseModel):
+    """
+    Final suggestion after orchestrator review (kept or merged).
+    """
+    issue: str = Field(
+        description="The issue statement (original or merged)"
+    )
+    line: int = Field(
+        description="Line number where this issue occurs"
+    )
+    severity_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Severity score (may be adjusted by orchestrator if merged)"
+    )
+    explanation: str = Field(
+        description="Explanation (original or merged)"
+    )
+    suggested_fix: str = Field(
+        description="Suggested fix (original or merged)"
+    )
+    agent_sources: List[str] = Field(
+        description="Which agents contributed to this suggestion (e.g., ['clarity', 'rigor'])"
+    )
+    orchestrator_note: Optional[str] = Field(
+        None,
+        description="Optional note from orchestrator (e.g., 'Merged from 2 suggestions', 'Contradiction resolved')"
+    )
+
+
+class OrchestratorSectionResponse(BaseModel):
+    """
+    Orchestrator's final suggestions for one section.
+    """
+    suggestions: List[OrchestratedSuggestion] = Field(
+        description="Final list of suggestions after deduplication, merging, and quality control.",
         default_factory=list
     )
 
@@ -72,6 +120,7 @@ class SuggestionItem(BaseModel):
     text: str = Field(..., description="Suggestion text")
     line: int = Field(..., description="Line number where issue occurs")
     severity: SeverityLevel = Field(default=SeverityLevel.INFO, description="Severity level")
+    severity_score: Optional[float] = Field(None, ge=0.0, le=1.0, description="Severity confidence score (0.0-1.0)")
     explanation: Optional[str] = Field(None, description="Detailed explanation")
     suggested_fix: Optional[str] = Field(None, description="Suggested fix if applicable")
 

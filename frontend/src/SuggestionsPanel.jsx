@@ -6,6 +6,9 @@ import channelIcon from './assets/icons/channel.svg'
 import searchIcon from './assets/icons/search-alt.svg'
 import sigmaIcon from './assets/icons/sigma.svg'
 import trashIcon from './assets/icons/trash-alt.svg'
+import redIcon from './assets/icons/red.png'
+import yellowIcon from './assets/icons/yellow.png'
+import blueIcon from './assets/icons/blue.png'
 
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
@@ -15,8 +18,10 @@ function SuggestionsPanel({ latexContent, onClose, onSuggestionsChange, expanded
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [totalStats, setTotalStats] = useState({ clarity: 0, rigor: 0 })
+  const [severityStats, setSeverityStats] = useState({ error: 0, warning: 0, info: 0 })
   const [selectedAgent, setSelectedAgent] = useState('all') // 'clarity', 'rigor', 'all'
   const [hasRun, setHasRun] = useState(false)
+  const [expandedExplanations, setExpandedExplanations] = useState(new Set())
 
   // When a marker is clicked, expand that section
   useEffect(() => {
@@ -55,16 +60,26 @@ function SuggestionsPanel({ latexContent, onClose, onSuggestionsChange, expanded
       if (response.data.success) {
         setSuggestions(response.data.sections)
 
-        // Calculate stats
+        // Calculate agent-based stats
         const stats = { clarity: 0, rigor: 0, ethics: 0, style: 0, grammar: 0 }
+        const sevStats = { error: 0, warning: 0, info: 0 }
+
         response.data.sections.forEach(section => {
           section.suggestions.forEach(group => {
             if (stats[group.type] !== undefined) {
               stats[group.type] += group.count
             }
+            // Count by severity
+            group.items.forEach(item => {
+              if (sevStats[item.severity] !== undefined) {
+                sevStats[item.severity] += 1
+              }
+            })
           })
         })
+
         setTotalStats(stats)
+        setSeverityStats(sevStats)
       } else {
         setError(response.data.error || 'Failed to fetch suggestions')
         setSuggestions([])
@@ -82,6 +97,7 @@ function SuggestionsPanel({ latexContent, onClose, onSuggestionsChange, expanded
     // Clear previous suggestions before running new analysis
     setSuggestions([])
     setTotalStats({ clarity: 0, rigor: 0 })
+    setSeverityStats({ error: 0, warning: 0, info: 0 })
     setError(null)
     setHasRun(true)
     fetchSuggestions(selectedAgent)
@@ -90,8 +106,13 @@ function SuggestionsPanel({ latexContent, onClose, onSuggestionsChange, expanded
   const handleClearSuggestions = () => {
     setSuggestions([])
     setTotalStats({ clarity: 0, rigor: 0 })
+    setSeverityStats({ error: 0, warning: 0, info: 0 })
     setError(null)
     setHasRun(false)
+    // Notify parent to clear markers
+    if (onSuggestionsChange) {
+      onSuggestionsChange([])
+    }
   }
 
   const handleRefreshSuggestions = () => {
@@ -111,9 +132,9 @@ function SuggestionsPanel({ latexContent, onClose, onSuggestionsChange, expanded
 
   const getSeverityBadge = (severity) => {
     const badges = {
-      error: { emoji: '🔴', label: 'Error', class: 'severity-error' },
-      warning: { emoji: '🟡', label: 'Warning', class: 'severity-warning' },
-      info: { emoji: '🔵', label: 'Info', class: 'severity-info' }
+      error: { icon: redIcon, label: 'Error', class: 'severity-error', color: '#EF4444' },
+      warning: { icon: yellowIcon, label: 'Warning', class: 'severity-warning', color: '#F59E0B' },
+      info: { icon: blueIcon, label: 'Info', class: 'severity-info', color: '#3B82F6' }
     }
     return badges[severity] || badges.info
   }
@@ -121,6 +142,18 @@ function SuggestionsPanel({ latexContent, onClose, onSuggestionsChange, expanded
   const toggleSection = (sectionName) => {
     console.log('toggleSection called:', sectionName, 'current expanded:', expandedSection)
     setExpandedSection(expandedSection === sectionName ? null : sectionName)
+  }
+
+  const toggleExplanation = (itemId) => {
+    setExpandedExplanations(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      return newSet
+    })
   }
 
   return (
@@ -165,6 +198,35 @@ function SuggestionsPanel({ latexContent, onClose, onSuggestionsChange, expanded
           </button>
         )}
       </div>
+
+      {/* Severity Statistics */}
+      {hasRun && (severityStats.error > 0 || severityStats.warning > 0 || severityStats.info > 0) && (
+        <div className="severity-stats-bar">
+          <div className="severity-stats">
+            {severityStats.error > 0 && (
+              <span className="severity-stat-badge error">
+                <img src={redIcon} alt="" className="severity-stat-icon" />
+                <span className="severity-stat-label">Errors:</span>
+                <span className="severity-stat-count">{severityStats.error}</span>
+              </span>
+            )}
+            {severityStats.warning > 0 && (
+              <span className="severity-stat-badge warning">
+                <img src={yellowIcon} alt="" className="severity-stat-icon" />
+                <span className="severity-stat-label">Warnings:</span>
+                <span className="severity-stat-count">{severityStats.warning}</span>
+              </span>
+            )}
+            {severityStats.info > 0 && (
+              <span className="severity-stat-badge info">
+                <img src={blueIcon} alt="" className="severity-stat-icon" />
+                <span className="severity-stat-label">Info:</span>
+                <span className="severity-stat-count">{severityStats.info}</span>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Agent Selection Controls */}
       <div className="agent-controls">
@@ -278,15 +340,39 @@ function SuggestionsPanel({ latexContent, onClose, onSuggestionsChange, expanded
                       <div className="suggestion-items">
                         {suggestionGroup.items.map((item, iIdx) => {
                           const severityBadge = getSeverityBadge(item.severity)
+                          const itemId = `${idx}-${gIdx}-${iIdx}`
+                          const isExplanationExpanded = expandedExplanations.has(itemId)
                           return (
                             <div key={iIdx} className={`suggestion-item ${severityBadge.class}`}>
                               <div className="item-header">
-                                <span className="severity-badge">{severityBadge.emoji} {severityBadge.label}</span>
+                                <div className="severity-info">
+                                  <span className="severity-badge">
+                                    <img src={severityBadge.icon} alt={severityBadge.label} className="severity-icon" />
+                                    {severityBadge.label}
+                                  </span>
+                                  {item.severity_score !== undefined && item.severity_score !== null && (
+                                    <span className="severity-score">
+                                      {item.severity_score.toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="item-line">Line {item.line}</span>
                               </div>
-                              <div className="item-text">{item.text}</div>
+                              <div className="item-text">
+                                <span className="item-label">Issue:</span> {item.text}
+                              </div>
                               {item.explanation && (
-                                <div className="item-explanation">{item.explanation}</div>
+                                <>
+                                  <button
+                                    className="explanation-toggle"
+                                    onClick={() => toggleExplanation(itemId)}
+                                  >
+                                    {isExplanationExpanded ? '▼' : '▶'} Explanation
+                                  </button>
+                                  {isExplanationExpanded && (
+                                    <div className="item-explanation">{item.explanation}</div>
+                                  )}
+                                </>
                               )}
                               {item.suggested_fix && (
                                 <div className="item-fix">

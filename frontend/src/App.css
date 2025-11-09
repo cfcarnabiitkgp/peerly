@@ -149,37 +149,6 @@
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
-.auto-compile-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1rem;
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  user-select: none;
-}
-
-.auto-compile-toggle:hover {
-  background: #F9FAFB;
-  border-color: #CBD5E1;
-}
-
-.auto-compile-toggle input[type="checkbox"] {
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  accent-color: #3C50E0;
-}
-
-.auto-compile-toggle span {
-  color: #64748B;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
 .status {
   padding: 0.75rem 2rem;
   text-align: center;

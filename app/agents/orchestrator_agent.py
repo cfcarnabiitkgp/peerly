@@ -1,23 +1,45 @@
 """
-Orchestrator Agent - Validates, prioritizes, and cross-checks suggestions from other agents.
+LLM-Based Orchestrator Agent - Intelligently validates, deduplicates, and merges suggestions.
+
+Uses GPT-4 to:
+- Detect semantic duplicates (not just text overlap)
+- Identify contradictions between agents
+- Merge similar suggestions into concise versions
+- Prioritize by impact and actionability
+- Quality control on suggestion value
 """
-from typing import List
+import asyncio
+from typing import List, Dict
 from langchain_openai import ChatOpenAI
-from app.models.schemas import SectionSuggestions, SuggestionGroup
+from app.models.schemas import (
+    SectionSuggestions,
+    SuggestionGroup,
+    SuggestionItem,
+    SuggestionType,
+    SeverityLevel,
+    OrchestratedSuggestion,
+    OrchestratorSectionResponse,
+)
 from app.config.settings import settings
+from app.utils.severity import score_to_severity_level
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class OrchestratorAgent:
     """
-    Orchestrator agent that validates and prioritizes suggestions from specialist agents.
-    Performs final quality control and removes duplicates.
+    LLM-powered orchestrator that intelligently processes suggestions from all agents.
+
+    Uses parallel processing (asyncio.gather) to orchestrate each section independently,
+    then combines results.
     """
 
     def __init__(self):
         self.agent_name = "Orchestrator Agent"
         self.llm = ChatOpenAI(
             model=settings.openai_model,
-            temperature=0.2,  # Lower temperature for more consistent validation
+            temperature=0.2,  # Lower temperature for consistent decisions
             api_key=settings.openai_api_key
         )
 
@@ -26,109 +48,274 @@ class OrchestratorAgent:
         section_suggestions: List[SectionSuggestions]
     ) -> List[SectionSuggestions]:
         """
-        Validate and prioritize suggestions from all agents.
+        Validate and prioritize suggestions from all agents using LLM.
+
+        Processes sections in parallel using asyncio.gather for efficiency.
 
         Args:
             section_suggestions: Combined suggestions from all agents
 
         Returns:
-            Validated and prioritized suggestions
+            Validated, deduplicated, and prioritized suggestions
         """
-        validated_suggestions = []
+        logger.info(f"Orchestrator processing {len(section_suggestions)} sections in parallel")
 
-        for section_sugg in section_suggestions:
-            # Remove duplicates
-            deduplicated = self._remove_duplicates(section_sugg)
+        # Process all sections in parallel
+        tasks = [
+            self._orchestrate_section(section_sugg)
+            for section_sugg in section_suggestions
+        ]
 
-            # Sort by severity
-            sorted_sugg = self._sort_by_severity(deduplicated)
+        orchestrated_sections = await asyncio.gather(*tasks)
 
-            validated_suggestions.append(sorted_sugg)
+        logger.info(f"Orchestrator completed processing {len(orchestrated_sections)} sections")
+        return orchestrated_sections
 
-        return validated_suggestions
-
-    def _remove_duplicates(self, section_sugg: SectionSuggestions) -> SectionSuggestions:
+    async def _orchestrate_section(
+        self,
+        section_sugg: SectionSuggestions
+    ) -> SectionSuggestions:
         """
-        Remove duplicate or very similar suggestions.
+        Orchestrate suggestions for a single section using LLM.
+
+        The LLM reviews all suggestions for this section and decides:
+        - Which to keep as-is
+        - Which to merge (semantic duplicates)
+        - Which to discard (low value, contradictory)
+        - How to resolve contradictions
 
         Args:
-            section_sugg: Section suggestions
+            section_sugg: All suggestions for one section from all agents
 
         Returns:
-            Deduplicated section suggestions
+            Orchestrated section with deduplicated, merged suggestions
         """
-        seen_texts = set()
-        unique_groups = []
+        # Quick check: if no suggestions, return as-is
+        if not section_sugg.suggestions or all(len(g.items) == 0 for g in section_sugg.suggestions):
+            return section_sugg
 
+        # Flatten all suggestions into a list with metadata
+        all_items = []
         for group in section_sugg.suggestions:
-            unique_items = []
-
             for item in group.items:
-                # Simple deduplication based on text similarity
-                text_lower = item.text.lower()
+                all_items.append({
+                    "agent": str(group.type),
+                    "issue": item.text,
+                    "line": item.line,
+                    "severity_score": item.severity_score or 0.5,
+                    "explanation": item.explanation or "",
+                    "suggested_fix": item.suggested_fix or ""
+                })
 
-                # Check if similar suggestion already exists
-                is_duplicate = any(
-                    self._similarity_score(text_lower, seen_text) > 0.8
-                    for seen_text in seen_texts
-                )
+        # If only 1-2 suggestions, skip LLM orchestration (not worth the cost)
+        if len(all_items) <= 2:
+            logger.debug(f"Section '{section_sugg.section}' has only {len(all_items)} suggestions, skipping orchestration")
+            return self._sort_by_severity_score(section_sugg)
 
-                if not is_duplicate:
-                    unique_items.append(item)
-                    seen_texts.add(text_lower)
+        try:
+            # Call LLM to orchestrate
+            orchestrated = await self._llm_orchestrate(
+                section_name=section_sugg.section,
+                section_type=section_sugg.section_type,
+                suggestions=all_items
+            )
 
-            if unique_items:
-                unique_groups.append(SuggestionGroup(
-                    type=group.type,
-                    count=len(unique_items),
-                    items=unique_items
+            # Convert back to SectionSuggestions format
+            return self._rebuild_section_suggestions(section_sugg, orchestrated)
+
+        except Exception as e:
+            logger.error(f"Error in LLM orchestration for section '{section_sugg.section}': {e}")
+            # Fallback to simple sorting
+            return self._sort_by_severity_score(section_sugg)
+
+    async def _llm_orchestrate(
+        self,
+        section_name: str,
+        section_type: str,
+        suggestions: List[Dict]
+    ) -> OrchestratorSectionResponse:
+        """
+        Call LLM to orchestrate suggestions for one section.
+
+        Args:
+            section_name: Name of the section
+            section_type: Type of section (e.g., "introduction", "methodology")
+            suggestions: List of all suggestions from all agents
+
+        Returns:
+            Orchestrator's final suggestions (deduplicated, merged, prioritized)
+        """
+        # Build the system prompt
+        system_prompt = self._get_system_prompt()
+
+        # Build the user prompt with all suggestions
+        user_prompt = self._build_user_prompt(section_name, section_type, suggestions)
+
+        # Create structured LLM
+        structured_llm = self.llm.with_structured_output(OrchestratorSectionResponse)
+
+        # Call LLM
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        response = await structured_llm.ainvoke(messages)
+        return response
+
+    def _get_system_prompt(self) -> str:
+        """Get the system prompt for orchestrator LLM."""
+        return """You are an expert peer review orchestrator for academic research papers.
+
+Your job is to review suggestions from multiple specialized agents (Clarity, Rigor, etc.)
+and produce a final, high-quality list of suggestions for the author.
+
+**Your responsibilities:**
+
+1. **Detect Duplicates**: Identify suggestions that are semantically similar, even if worded differently.
+   - Example: "Variable x is undefined" and "Missing definition for variable x" → MERGE
+
+2. **Merge Similar Suggestions**: Combine redundant suggestions into one concise, comprehensive suggestion.
+   - Keep the higher severity_score
+   - Combine insights from both explanations
+   - List all contributing agents in agent_sources
+
+3. **Detect Contradictions**: Identify when agents give conflicting advice.
+   - Example: Clarity says "shorten", Rigor says "add more detail"
+   - Resolve intelligently: balance or prioritize based on impact
+   - Add orchestrator_note explaining the resolution
+
+4. **Quality Control**: Discard suggestions that are:
+   - Too minor or nitpicky (very low value)
+   - Redundant after merging
+   - Not actionable
+
+5. **Prioritize**: Order by impact × actionability, not just severity score.
+
+**Guidelines:**
+- Be CONSERVATIVE: When in doubt, keep the suggestion
+- Preserve important feedback even if minor
+- For contradictions, try to find a balanced middle ground
+- Keep suggestions concise (1-2 sentences each field)
+- Maintain the author's voice - don't be overly critical
+
+Output a list of final suggestions, deduplicated and prioritized."""
+
+    def _build_user_prompt(
+        self,
+        section_name: str,
+        section_type: str,
+        suggestions: List[Dict]
+    ) -> str:
+        """Build user prompt with all suggestions for this section."""
+        # Format suggestions nicely
+        formatted_suggestions = []
+        for i, sugg in enumerate(suggestions, 1):
+            formatted_suggestions.append(
+                f"{i}. **Agent**: {sugg['agent']}\n"
+                f"   **Line**: {sugg['line']}\n"
+                f"   **Severity Score**: {sugg['severity_score']:.2f}\n"
+                f"   **Issue**: {sugg['issue']}\n"
+                f"   **Explanation**: {sugg['explanation']}\n"
+                f"   **Suggested Fix**: {sugg['suggested_fix']}\n"
+            )
+
+        suggestions_text = "\n".join(formatted_suggestions)
+
+        return f"""Review the following suggestions for the **{section_name}** section (type: {section_type}).
+
+**All Suggestions ({len(suggestions)} total):**
+
+{suggestions_text}
+
+Please analyze these suggestions and produce a final, deduplicated list:
+- Merge semantically similar suggestions
+- Detect and resolve contradictions
+- Discard low-value suggestions
+- Prioritize by impact and actionability
+
+For each final suggestion, specify:
+- issue, line, severity_score, explanation, suggested_fix
+- agent_sources: list of agents that contributed (e.g., ["clarity"], ["clarity", "rigor"])
+- orchestrator_note: optional note if merged or resolved contradiction
+"""
+
+    def _rebuild_section_suggestions(
+        self,
+        original_section: SectionSuggestions,
+        orchestrated: OrchestratorSectionResponse
+    ) -> SectionSuggestions:
+        """
+        Convert orchestrated suggestions back to SectionSuggestions format.
+
+        Groups suggestions by agent_sources to rebuild SuggestionGroups.
+        """
+        # Group orchestrated suggestions by primary agent
+        grouped: Dict[SuggestionType, List[SuggestionItem]] = {}
+
+        for orch_sugg in orchestrated.suggestions:
+            # Determine primary agent (first in sources, or 'clarity' as default)
+            primary_agent = orch_sugg.agent_sources[0] if orch_sugg.agent_sources else "clarity"
+
+            # Map to SuggestionType enum
+            agent_type_map = {
+                "clarity": SuggestionType.CLARITY,
+                "rigor": SuggestionType.RIGOR,
+                "ethics": SuggestionType.ETHICS,
+                "style": SuggestionType.STYLE,
+                "grammar": SuggestionType.GRAMMAR,
+            }
+            suggestion_type = agent_type_map.get(primary_agent, SuggestionType.CLARITY)
+
+            # Determine severity level from score using centralized utility
+            severity = score_to_severity_level(orch_sugg.severity_score)
+
+            # Create SuggestionItem
+            item = SuggestionItem(
+                text=orch_sugg.issue,
+                line=orch_sugg.line,
+                severity=severity,
+                severity_score=orch_sugg.severity_score,
+                explanation=orch_sugg.explanation,
+                suggested_fix=orch_sugg.suggested_fix
+            )
+
+            if suggestion_type not in grouped:
+                grouped[suggestion_type] = []
+            grouped[suggestion_type].append(item)
+
+        # Rebuild SuggestionGroups
+        new_groups = []
+        for suggestion_type, items in grouped.items():
+            if items:
+                # Sort by severity score (highest first)
+                items.sort(key=lambda x: x.severity_score or 0, reverse=True)
+
+                new_groups.append(SuggestionGroup(
+                    type=suggestion_type,
+                    count=len(items),
+                    items=items
                 ))
 
         return SectionSuggestions(
-            section=section_sugg.section,
-            line=section_sugg.line,
-            section_type=section_sugg.section_type,
-            suggestions=unique_groups
+            section=original_section.section,
+            line=original_section.line,
+            section_type=original_section.section_type,
+            suggestions=new_groups
         )
 
-    def _sort_by_severity(self, section_sugg: SectionSuggestions) -> SectionSuggestions:
+    def _sort_by_severity_score(self, section_sugg: SectionSuggestions) -> SectionSuggestions:
         """
-        Sort suggestions by severity (error > warning > info).
+        Simple fallback: sort suggestions by severity score (highest first).
 
-        Args:
-            section_sugg: Section suggestions
-
-        Returns:
-            Sorted section suggestions
+        Used when LLM orchestration is skipped or fails.
         """
-        severity_order = {'error': 0, 'warning': 1, 'info': 2}
-
         for group in section_sugg.suggestions:
-            group.items.sort(key=lambda x: severity_order.get(x.severity, 3))
-
+            group.items.sort(
+                key=lambda x: (x.severity_score or 0),
+                reverse=True
+            )
         return section_sugg
-
-    def _similarity_score(self, text1: str, text2: str) -> float:
-        """
-        Calculate similarity score between two texts (simple word overlap).
-
-        Args:
-            text1: First text
-            text2: Second text
-
-        Returns:
-            Similarity score between 0 and 1
-        """
-        words1 = set(text1.split())
-        words2 = set(text2.split())
-
-        if not words1 or not words2:
-            return 0.0
-
-        intersection = words1.intersection(words2)
-        union = words1.union(words2)
-
-        return len(intersection) / len(union) if union else 0.0
 
 
 # Singleton instance

@@ -20,7 +20,6 @@ function App() {
   const [compileStatus, setCompileStatus] = useState('')
   const [pdfAvailable, setPdfAvailable] = useState(false)
   const [pdfUrl, setPdfUrl] = useState('')
-  const [autoCompile, setAutoCompile] = useState(false)
   const [showFileManager, setShowFileManager] = useState(true)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [fileManagerCollapsed, setFileManagerCollapsed] = useState(false)
@@ -39,7 +38,6 @@ function App() {
   // Total = 5 parts, so editor and preview get 40% each, suggestions gets 20%
 
   const previewRef = useRef(null)
-  const compileTimerRef = useRef(null)
 
   // Initialize MathJax
   useEffect(() => {
@@ -157,9 +155,7 @@ function App() {
         setPdfAvailable(true)
         // Update PDF preview with cache-busting timestamp
         setPdfUrl(`${API_URL}/preview-pdf?t=${Date.now()}`)
-        if (!autoCompile) {
-          setTimeout(() => setCompileStatus(''), 3000)
-        }
+        setTimeout(() => setCompileStatus(''), 3000)
       } else {
         setCompileStatus(`Error: ${response.data.error}`)
         setPdfUrl('')
@@ -171,27 +167,6 @@ function App() {
       setIsCompiling(false)
     }
   }
-
-  // Auto-compile with debouncing
-  useEffect(() => {
-    if (!autoCompile) return
-
-    // Clear existing timer
-    if (compileTimerRef.current) {
-      clearTimeout(compileTimerRef.current)
-    }
-
-    // Set new timer to compile after 2 seconds of no changes
-    compileTimerRef.current = setTimeout(() => {
-      compileToPDF()
-    }, 2000)
-
-    return () => {
-      if (compileTimerRef.current) {
-        clearTimeout(compileTimerRef.current)
-      }
-    }
-  }, [latex, autoCompile])
 
   const downloadPDF = () => {
     window.open(`${API_URL}/download-pdf`, '_blank')
@@ -227,14 +202,6 @@ function App() {
           <img src={logo} alt="Peerly Logo" className="app-logo" />
         </div>
         <div className="controls">
-          <label className="auto-compile-toggle">
-            <input
-              type="checkbox"
-              checked={autoCompile}
-              onChange={(e) => setAutoCompile(e.target.checked)}
-            />
-            <span>Auto-compile</span>
-          </label>
           {!showSuggestions && (
             <button
               className="summon-insights-btn"
