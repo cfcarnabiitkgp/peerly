@@ -58,6 +58,12 @@ COPY --from=builder /app/.venv /app/.venv
 COPY app ./app
 COPY pyproject.toml uv.lock ./
 
+# Pre-download FastEmbed model for semantic cache (if enabled)
+# This avoids downloading on first request (saves 10-20s cold start time)
+RUN echo "Pre-downloading FastEmbed model..." \
+    && /app/.venv/bin/python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')" \
+    && echo "FastEmbed model cached successfully"
+
 # Create directories for LaTeX compilation
 RUN mkdir -p /tmp/latex-editor-project /tmp/latex-editor-output
 
