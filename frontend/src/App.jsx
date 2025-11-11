@@ -234,19 +234,18 @@ function App() {
                 maxWidth: '400px'
               }}
             >
-              <div className="panel-header">
-                <button
-                  className="collapse-btn-icon"
-                  onClick={() => setFileManagerCollapsed(!fileManagerCollapsed)}
-                  title={fileManagerCollapsed ? 'Expand files' : 'Collapse files'}
-                >
-                  <img
-                    src={fileManagerCollapsed ? angleRightIcon : angleLeftIcon}
-                    alt={fileManagerCollapsed ? 'Expand' : 'Collapse'}
-                    className="collapse-icon"
-                  />
-                </button>
-              </div>
+              {/* Vertical drawer handle on right edge */}
+              <button
+                className="file-drawer-handle"
+                onClick={() => setFileManagerCollapsed(!fileManagerCollapsed)}
+                title={fileManagerCollapsed ? 'Expand files' : 'Collapse files'}
+              >
+                <img
+                  src={fileManagerCollapsed ? angleRightIcon : angleLeftIcon}
+                  alt={fileManagerCollapsed ? 'Expand' : 'Collapse'}
+                  className="drawer-handle-icon"
+                />
+              </button>
               {!fileManagerCollapsed && (
                 <div className="file-manager-content">
                   <FileManager onLoadTexFile={loadTexContent} />

@@ -209,6 +209,8 @@
 
 .files-panel {
   transition: width 0.3s ease;
+  position: relative;
+  overflow: visible;
 }
 
 .files-panel.collapsed {
@@ -224,13 +226,60 @@
   height: 100%;
 }
 
-.files-panel.collapsed .collapse-btn-icon {
-  padding: 0.5rem 0.25rem;
+.files-panel.collapsed .file-drawer-handle {
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .file-manager-content {
   flex: 1;
   overflow: auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* File manager drawer handle - matching AI suggestions style */
+.file-drawer-handle {
+  position: absolute;
+  right: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 60px;
+  background: linear-gradient(135deg, #6563ff 0%, #8B5CF6 100%);
+  border: none;
+  border-radius: 0 0.375rem 0.375rem 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 2px 2px 8px rgba(101, 99, 255, 0.3);
+  transition: all 0.3s ease;
+  z-index: 1000;
+  animation: handlePulse 2s ease-in-out infinite;
+}
+
+@keyframes handlePulse {
+  0%, 100% {
+    box-shadow: 2px 2px 8px rgba(101, 99, 255, 0.3);
+  }
+  50% {
+    box-shadow: 4px 4px 16px rgba(101, 99, 255, 0.6);
+  }
+}
+
+.file-drawer-handle:hover {
+  right: -28px;
+  width: 28px;
+  box-shadow: 4px 4px 12px rgba(101, 99, 255, 0.4);
+  background: linear-gradient(135deg, #5048e0 0%, #7C3AED 100%);
+  animation: none;
+}
+
+.file-drawer-handle .drawer-handle-icon {
+  width: 14px;
+  height: 14px;
+  filter: brightness(0) invert(1);
 }
 
 .editor-panel > div:not(.panel-header) {
@@ -238,6 +287,16 @@
   overflow: hidden;
   width: 100%;
   height: 100%;
+}
+
+/* CodeMirror gutter adjustments to avoid overlap with drawer handle */
+.editor-panel .cm-editor .cm-gutters {
+  padding-left: 8px;
+}
+
+.editor-panel .cm-editor .cm-gutter.cm-lineNumbers {
+  min-width: 40px;
+  padding-left: 12px;
 }
 
 .panel-header {
@@ -305,52 +364,6 @@
   flex: 1;
 }
 
-.collapse-btn {
-  padding: 0.25rem 0.5rem;
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: #64748B;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-}
-
-.collapse-btn:hover {
-  background: #F1F5F9;
-  border-color: #CBD5E1;
-  color: #3C50E0;
-}
-
-.collapse-btn-icon {
-  padding: 0.5rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.25rem;
-}
-
-.collapse-btn-icon:hover {
-  background: #F1F5F9;
-}
-
-.collapse-icon {
-  width: 20px;
-  height: 20px;
-  transition: transform 0.2s;
-}
-
-.collapse-btn-icon:hover .collapse-icon {
-  transform: scale(1.1);
-}
 
 .preview-content {
   flex: 1;
