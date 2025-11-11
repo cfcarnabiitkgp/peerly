@@ -38,7 +38,14 @@ class Settings(BaseSettings):
 
     # RAG Configuration
     use_rag: bool = True  # Enable/disable RAG (set USE_RAG=false to disable)
-    use_semantic_cache: bool = False  # Enable/disable semantic caching for RAG queries
+    use_semantic_cache: bool = True  # Enable/disable semantic caching for RAG queries
+
+    # Review Result Cache Configuration
+    review_cache_enabled: bool = True # Enable/disable caching of review results
+    review_cache_similarity_threshold: float = 0.98  # Similarity threshold for cache hits (0.0-1.0)
+    review_cache_fingerprint_length: int = 2000  # Max characters for document fingerprint
+    review_cache_max_candidates: int = 5  # Max similar documents to check for exact match
+    review_cache_strict_matching: bool = False  # True=semantic+hash (strict), False=semantic only (lenient)
 
     # Railway-specific settings
     railway_environment: str | None = None  # Will be "production" on Railway

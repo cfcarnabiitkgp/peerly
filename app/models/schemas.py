@@ -160,3 +160,4 @@ class ReviewResponse(BaseModel):
     total_suggestions: int = Field(0, description="Total number of suggestions")
     processing_time: float = Field(..., description="Time taken to process in seconds")
     error: Optional[str] = Field(None, description="Error message if any")
+    cached: bool = Field(default=False, description="Whether this result was served from cache")
